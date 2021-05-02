@@ -1,0 +1,381 @@
+---
+title: 'Project 1: Forecasting Monthly Yellowstone Visitors'
+author: "Elizabeth Combs (eac721)"
+date: "04/06/2021"
+output: 
+  html_document:
+    toc: yes
+    theme: yeti
+    number_sections: yes
+    highlight: tango
+urlcolor: blue
+---
+    
+
+```{r setup, include=FALSE}
+
+#library(webshot)
+#webshot::install_phantomjs()
+
+knitr::opts_chunk$set(echo = FALSE) # dev = 'pdf'
+library("forecast", quietly = T)
+library('reshape2')
+library('DT')
+library('plotly')
+library("ggplot2")
+library('lubridate')
+```
+
+# Introduction
+
+The data for this project was retrieved from NPS Stats, which houses the National Park Service data for monthly visitors per park in the United States: ([link to site](https://irma.nps.gov/Stats) and [link to data](https://irma.nps.gov/STATS/SSRSReports/Park%20Specific%20Reports/Recreation%20Visitors%20By%20Month%20(1979%20-%20Last%20Calendar%20Year)?Park=YELL)). Yellowstone National Park was chosen for this project because it has both a long history and a high visitation rate. As the first official US National Park, Yellowstone remains one of the most popular. The data is available each month from January 1979 through February 2021.  <br/>
+
+This project focuses on the number of `Recreation Visits By Month`. Recreation visits include any entry of a person onto lands or waters administered by the NPS excluding non-reportable and non-recreation visits. Additional documentation on the park statistics gathered is available [here](https://www.nps.gov/subjects/socialscience/upload/nps-stats-definitions_accessible1.pdf). 
+
+*Please note that a dynamic version of this report is available at this [link](https://elizabethannecombs.com/wp-content/uploads/2021/03/project_01_eac721.html).*
+
+```{r, echo=F}
+# Read in data:
+# Source: NPS
+
+path <- './yellowstone_visits.csv'
+ys.data <- read.csv(path)
+#datatable(ys.data[, 1:13], options = list(pageLength = 3))
+
+```
+
+# Data Exploration
+
+## Data Transformation
+
+In order to conduct this study, the data was first transformed to a long instead of wide dataset using the `reshape` library in `R`. Now, the data is a time-series dataset with monthly data from January 1979 to February 2021, a total of 506 data points.
+
+```{r}
+# build the monthly ts
+ys.data<-melt(ys.data[,1:13], id.vars = "Year")
+ys.data$date <- as.Date(paste(ys.data$Year, ys.data$variable, "01", sep = "-"),format = ("%Y-%b-%d"))
+ys.data <- ys.data[order(ys.data$date), ]
+ys.data <- ys.data[ys.data$date<=as.Date('2021-02-01'), ]
+
+#datatable(ys.data, options = list(pageLength = 3))
+```
+
+## Take Logs
+
+To build time series models, we need to decide whether we must take logs. Logs can help turn exponential growth into linear growth in macroeconomic variables. It also helps eliminate level-dependent volatility. We can review four plots to make this decision: 
+
+1. Original Time Series
+2. Differenced Original Time Series
+3. Log Time Series
+4. Differenced Log Time Series
+
+```{r, warning = FALSE, echo=FALSE, fig.show="hold", fig.width=30, fig.height=3, out.width='100%'}
+
+# Time series plot
+# plot(ys.data$date, ys.data$value, type="l",
+#      xlab="Date", ylab="Vistors", main = 'Monthly Yellowstone Vistors')
+ys.data$lab1 <- 'Monthly Vistors'
+ys.data$lab2 <- 'Monthly Diff. Vistors'
+ys.data$lab3 <- 'Monthly Log Vistors'
+ys.data$lab4 <- 'Monthly Diff. Log Vistors'
+
+ys.data$value_diff <- c(NA, diff(ys.data$value))
+
+plot1<- ggplot(ys.data, aes(x = date, y = value)) + geom_line(color="springgreen4") + xlab("Date") + ylab("Monthly Visitors") + ggtitle("Monthly Yellowstone Visitors Over Time") + theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) + facet_wrap(~lab1)
+#ggplotly(plot1)  
+
+plot2 <- ggplot(ys.data, aes(x = date, y = value_diff)) + geom_line(color="springgreen4") + xlab("Date") + ylab("Monthly Visitors") + ggtitle("Monthly Yellowstone Visitors Over Time") + theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  facet_wrap(~lab2)
+#ggplotly(plot2)
+
+# update 0 value
+
+# small value
+ys.data[ys.data$value == 0, 'value'] <- 10
+# last year
+# ys.data[ys.data$value == 0, 'value'] <- 48150 
+# NA 
+# ys.data[ys.data$value == 0, 'value'] <- NA
+
+
+# Take logs since level varies over time
+ys.data$log_visitors<-ys.data$value %>% log()
+ys.data$log_visitors_diff<- c(NA, diff(ys.data$log_visitors))
+
+# plot(ys.data$date, ys.data$log_visitors, type="l",
+#      xlab="Date", ylab="Vistors", main = 'Monthly Yellowstone Log(Vistors)')
+
+plot3 <- ggplot(ys.data, aes(x = date, y = log_visitors)) + geom_line(color="springgreen4") + ylim(2, 15) + xlab("Date") + ylab("Log Monthly Visitors") + ggtitle("Monthly Yellowstone Log Visitors Over Time")+ theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  facet_wrap(~lab3)
+
+plot4 <- ggplot(ys.data, aes(x = date, y = log_visitors_diff)) + geom_line(color="springgreen4") + xlab("Date") + ylab("Log Monthly Visitors") + ggtitle("Monthly Yellowstone Log Visitors Over Time")+ theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  facet_wrap(~lab4)
+
+subplot(plot1, plot2, margin = 0.05) %>% layout(xaxis = list(title = "Date", titlefont = list(size = 10)), xaxis2 = list(title = "Date", titlefont = list(size = 10)), yaxis = list(title = 'Visitors', titlefont = list(size = 10)), yaxis2 = list(title = 'Diff. Visitors', titlefont = list(size = 10)))
+
+
+```
+```{r warning = FALSE, echo=FALSE, fig.show="hold", fig.width=30, fig.height=3, out.width='100%'}
+
+subplot(plot3, plot4, margin = 0.05) %>% layout(xaxis = list(title = "Date", titlefont = list(size = 10)), xaxis2 = list(title = "Date", titlefont = list(size = 10)), yaxis = list(title = "Log Visitors", titlefont = list(size = 10)), yaxis2 = list(title = "Diff. Log Visitors", titlefont = list(size = 10)))
+```
+According to the figures above, we can see high visitation levels in summer months and low visitation levels in winter months. This phenomenon is likely due seasonal effects which could be dependent on temperatures in the park, availability of summer holidays, etc.
+
+The first two figures also indicate that there is likely level-dependent volatility, so the first step is to take the log to stabilize level-dependent volatility. In this case, this could be a macro-economic series dependent on population growth, economic conditions and other factors. After taking logs, we are assured that the series is not exponentially increasing (second row plots). 
+
+*Note that in order to compute the log of the series, any values that were zero, (which occurred only recently in the series due to nation-wide COVID lock downs in April 2020), were transformed to value 10. Other ways to transform the data include removing the data from the analysis completely (NA) and replacing the missing value with the previous year's value or another small value. Replacing a small value for the zero was chosen because it maintains the integrity of the actualized values while simplifying the transformations made.*
+
+## Seasonality Adjustment
+
+Following the level-change (we used natural log), the data still has contains the seasonal effect. For simplicity, we can remove the seasonal component by subtracting out the seasonal averages (monthly). This value is referred to as the Log Seasonally Adjusted Visitors.
+
+```{r, warning = FALSE, echo=FALSE, fig.align='center', out.width="100%", fig.width=12, fig.height=4}
+# remove the seasonal component
+seasonal_means <- aggregate(ys.data$log_visitors, list(ys.data$variable), mean, na.rm=T) %>% as.data.frame()
+seasonal_means$x<-round(seasonal_means$x, 2)
+colnames(seasonal_means)<-c('Month', 'Monthly Avg. Log Visitors')
+datatable(seasonal_means, options = list(pageLength = 12))
+
+# subtract the seasonal mean
+ys.data<-merge(ys.data,seasonal_means, by.x = 'variable',by.y = 'Month')
+ys.data$visitors_adj <- ys.data$log_visitors - ys.data$`Monthly Avg. Log Visitors`
+ys.data <- ys.data[order(ys.data$date), ]
+
+# plot(ys.data$date, ys.data$visitors_adj, type="l",
+#      xlab="Date", ylab="Vistors", main = 'Monthly Yellowstone Vistors (Seasonaly Adj.)')
+# zoom
+# plot(ys.data$date, ys.data$visitors_adj, type="l",
+#      xlab="Date", ylab="Vistors", main = 'Monthly Yellowstone Vistors (Seasonaly Adj.) - Zoomed', ylim = c(-2,2))
+```
+Once we subtract the Log Monthly Average, we can view the seasonally adjusted time-series below:
+
+```{r, warning = FALSE, echo=FALSE, fig.align='center', out.width="100%",fig.dim = c(8,3)}
+plot3 <- ggplot(ys.data, aes(x = date, y = visitors_adj)) + geom_line(color="springgreen4") + xlab("Date") + ylab("Log Monthly Visitors") + ggtitle("Monthly Yellowstone Log Seasonally Adj. Vistors Over Time")+ theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) 
+ggplotly(plot3) 
+```
+
+## Take Differences
+
+Now that we have transformed our data through logs and seasonal averages, we can start the model selection process to select d in the ARIMA(p,d,q). We can use the ACF plot to assess whether we think our series is *stationary* (mean-reverting). We would like to difference our data only so many times to make it stationary but want to make sure not to over-difference it.
+
+We can start with a value of d=0, which means we have not taken any differences yet. We are looking to see where the ACF and PACF plots cut off or die down to see if we can possibly identify an autoregressive (AR(p)) *or* moving average (MA(q)) model. To identify an ARIMA(p,d,q) model we will need to rely on another model selection tactic that uses AICC (see the next section).
+
+```{r, warning = FALSE, echo=FALSE, fig.align='center', out.width="100%", fig.dim = c(8,3)}
+plot4<- ggAcf(ys.data$visitors_adj) + ggtitle('ACF')
+plot5<-ggPacf(ys.data$visitors_adj) + ggtitle('ACF & PACF of Monthly Seasonally Adj. Visitors') + theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) 
+
+subplot(plot4, plot5, margin = 0.05) %>% layout(xaxis = list(title = "Lag", titlefont = list(size = 10)), xaxis2 = list(title = "Lag", titlefont = list(size = 10)), yaxis = list(title = 'ACF', titlefont = list(size = 10)), yaxis2 = list(title = 'PACF', titlefont = list(size = 10)))
+
+#Acf(ys.data$visitors_adj) 
+#Pacf(ys.data$visitors_adj) 
+```
+These graphs do not yield a very clear cut off for either AR or MA models. It looks like we could potentially use AR(1) *or* MA(1) models, but we will move forward with selecting an ARIMA(p,d,q) model in the next section (Model Selection). We still need to define d in this step, so we can test d=1 to see if we observe over-differencing yet. Overdifferencing signals could be an autocorrelation plot with the first autocorrelation close to -0.5 (the theoretical min. autocorrelation). <br/>
+
+```{r, fig.align='center', out.width="100%"}
+# check to take differences
+ys.data$diff_visitors_adj <- c(NA, diff(ys.data$visitors_adj))
+# plot(ys.data$date, ys.data$diff_visitors_adj, type="l",
+#      xlab="Date", ylab="Vistors", main = 'Diff. Monthly Yellowstone Vistors (Seasonaly Adj.)', ylim = c(-2,2))
+```
+
+```{r, fig.align='center', out.width="100%",fig.dim = c(8,3)}
+plot6 <- ggplot(ys.data, aes(x = date, y = diff_visitors_adj)) + geom_line(color="springgreen4") + xlab("Date") + ylab("Diff. Log Monthly Visitors") + ggtitle("Monthly Yellowstone Diff. Log Seasonally Adj. Vistors Over Time")+ theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) 
+ggplotly(plot6) 
+```
+
+```{r, warning = FALSE, echo=FALSE, out.width="100%", fig.align='center', fig.dim = c(8,3)}
+#Acf(ys.data$diff_visitors_adj) # overdifferenced
+#Pacf(ys.data$diff_visitors_adj) 
+# select d=0
+
+plot7<- ggAcf(ys.data$diff_visitors_adj) + ggtitle('ACF')
+plot8<-ggPacf(ys.data$diff_visitors_adj) + ggtitle('ACF & PACF of Diff. Log Monthly Seasonally Adj. Visitors') + theme(plot.title = element_text(size = 10, face = "bold", hjust=0.5)) 
+
+subplot(plot7, plot8, margin = 0.05) %>% layout(xaxis = list(title = "Lag", titlefont = list(size = 10)), xaxis2 = list(title = "Lag", titlefont = list(size = 10)), yaxis = list(title = 'ACF', titlefont = list(size = 10)), yaxis2 = list(title = 'PACF', titlefont = list(size = 10)))
+```
+In this case, we tested both d=0 and d=1 (above). We choose d=0 so that we avoid over-differencing, which was be observed in the ACF plot of the differenced series (left plot above) since the first autocorrelation is fairly close to -0.5. <br/>
+
+# Model Selection
+
+Once we have selected a value for d (d=0 in this case), then we can use the AICC to select values of p, q, and whether we need a constant in our model. We will select candidate models based on the ACF plots above and the candidate model with the lowest AICC will be the selected model. 
+
+```{r, echo=F}
+possible_p<-0:3
+possible_q<-0:3
+
+aicc_results <- data.frame(p=character(),
+                           d=character(),
+                 q=character(), 
+                 constant=character(), 
+                 aicc=numeric()) 
+
+# model selection among candidates
+i=0
+for(p in possible_p){
+        for(q in possible_q){
+                # constant
+                i<-i+1
+                #print(paste0('Running: ARIMA(', p, ', 0, ', q, ' with constant.)'))
+                aicc_results[i, 'p']<-p
+                aicc_results[i, 'd']<-0
+                aicc_results[i, 'q']<-q
+                aicc_results[i, 'constant']<-TRUE
+                aicc_results[i, 'aicc']<- Arima(ys.data$visitors_adj, c(p, 0, q), include.constant=T)$aicc
+                # no constant
+                i<-i+1
+                #print(paste0('Running: ARIMA(', p, ', 0, ', q, ' without constant.)'))
+                aicc_results[i, 'p']<-p
+                aicc_results[i, 'd']<-0
+                aicc_results[i, 'q']<-q
+                aicc_results[i, 'constant']<-FALSE
+                aicc_results[i, 'aicc']<-Arima(ys.data$visitors_adj, c(p, 0, q), include.constant=F)$aicc
+                
+        }
+}
+```
+
+```{r, echo=F, fig.align='center', fig.dim = c(8,3)}
+aicc_results$aicc <- round(aicc_results$aicc, 2)
+datatable(aicc_results[order(aicc_results$aicc),], #options = list(
+            #columnDefs = list(list(className = 'dt-center', targets = 0:4), 
+          options = list(pageLength = 10))
+            #))
+#datatable(aicc_results[which.min(aicc_results$aicc),])
+```
+The table above contains the results of the ARIMA model selection process with d=0. We will select the model with the lowest AICC which will give us the values for p, q, and whether we need a constant in our model. If we sort the table above by increasing AICC the first model is ARIMA(1, 0, 2) without a constant (min. AICC=595.5). *Note that normally with d=0, we should assume that the model needs a constant. However, in this case we have made seasonality adjustments to the data so we would like to allow the average value to be 0.*
+
+# Modeling
+
+The model we select based on the AICC criterion is ARIMA(1, 0, 2) without a constant. Now, we can fit the model to obtain the coefficients based on our data.
+
+```{r, echo=F}
+fit<-Arima(ys.data$visitors_adj, c(1, 0, 2), include.constant=F)
+#fit<-Arima(ys.data$visitors_adj, c(3, 0, 2), include.constant=T)
+
+summary(fit)
+```
+
+The model is $x_t =  0.9883x_{t-1} + \varepsilon_{t} - 0.7420 \varepsilon_{t-1} - 0.2106 \varepsilon_{t-2}$, where $x_t$ is the log seasonally adjusted visitors of Yellowstone National Park. 
+
+# Model Diagnostics
+
+The Ljung-Box test will compute hypothesis tests to see if our model is adequately representing our data. Since our data is monthly, we use yearly quantities (12, 24, 36, 48) to compute the cumulative fit. 
+
+```{r, echo=F}
+b1<-Box.test(x = fit$residuals, lag = 12, type = "Ljung")
+b2<-Box.test(x = fit$residuals, lag = 24, type = "Ljung")
+b3<-Box.test(x = fit$residuals, lag = 36, type = "Ljung")
+b4<-Box.test(x = fit$residuals, lag = 48, type = "Ljung") 
+# evidence that the model is adequate since no low p-values (p>0.05)
+
+# todo: dataframe
+df_box <- data.frame('statistic' = c(b1$statistic %>% as.numeric() %>% round(., 2), b2$statistic %>% as.numeric() %>% round(., 2), b3$statistic %>% as.numeric() %>% round(., 2), b4$statistic %>% as.numeric() %>% round(., 2)),
+                  'parameter' = c(b1$parameter %>% as.numeric(), b2$parameter %>% as.numeric(), b3$parameter %>% as.numeric(), b4$parameter %>% as.numeric()),
+                 'p.value' = c(b1$p.value %>% round(., 4), b2$p.value %>% round(., 4), b3$p.value %>% round(., 4), b4$p.value %>% round(., 4)),
+                 'method' = c(b1$method, b2$method, b3$method, b4$method) 
+                  )
+
+datatable(df_box, colnames = names(df_box), options = list(pageLength = 4))
+```
+Since we do not observe any low p-values in the table above, we observe that our model is adequate according to these criteria.
+
+Another diagnostic check is to review the residuals of our model visually and compute the ACF and PACF using the residuals. 
+
+```{r, warning = FALSE, echo=FALSE, out.width='100%', fig.align='center'}
+
+#plot(ys.data$date, fit$residuals, type='l', xlab="Date", ylab="Residuals Fitted")
+
+df_residuals<-data.frame(date = ys.data$date, 
+                         res = fit$residuals,
+                         res_sq = fit$residuals^2)
+```
+
+```{r,  echo=FALSE, out.width='100%', fig.width = 8, fig.height = 3, fig.align='center'}
+
+plot9 <- ggplot(df_residuals, aes(x = date, y = as.numeric(res))) + geom_line(color="blue") + xlab("Date") + ylab("Residuals") + ggtitle("Residuals of the Fitted Arima(1, 0, 2) Model")+ theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) 
+
+ggplotly(plot9) 
+
+```
+
+```{r, warning = FALSE, echo=FALSE, out.width='100%', fig.width = 8, fig.height = 3, fig.align='center'}
+#Acf(fit$residuals)
+#Pacf(fit$residuals)
+
+plot10<- ggAcf(df_residuals$res) + ggtitle('ACF')
+plot11<-ggPacf(df_residuals$res) + ggtitle('ACF & PACF of Residuals') + theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) 
+
+subplot(plot10, plot11, margin = 0.05) %>% layout(xaxis = list(title = "Lag", titlefont = list(size = 10)), xaxis2 = list(title = "Lag", titlefont = list(size = 10)), yaxis = list(title = 'ACF', titlefont = list(size = 10)), yaxis2 = list(title = 'PACF', titlefont = list(size = 10)))
+```
+
+```{r, warning = FALSE, echo=FALSE, out.width='100%', fig.width = 8, fig.height = 3, fig.align='center'}
+#plot(ys.data$date, fit$residuals^2, type='l', xlab="Date", ylab="Residuals Fitted")
+# plot12 <- ggplot(df_residuals, aes(x = date, y = residuals_squared)) + geom_line(color="blue") + xlab("Date") + ylab("Residuals") + ggtitle("Residuals Squared of the Fitted Arima(1, 0, 2) Model")+ theme(plot.title = element_text(size = 10, face = "bold")) 
+# ggplotly(plot12) 
+
+```
+
+```{r, warning = FALSE, echo=FALSE}
+#Acf(fit$residuals^2)
+#Pacf(fit$residuals^2)
+
+# plot13<- ggAcf(df_residuals$residuals_squared) + ggtitle('ACF')
+# plot14<-ggPacf(df_residuals$residuals_squared) + ggtitle('ACF & PACF of Residuals Squared') + theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) 
+# 
+# subplot(plot13, plot14, margin = 0.05) %>% layout(xaxis = list(title = "Lag", titlefont = list(size = 10)), xaxis2 = list(title = "Lag", titlefont = list(size = 10)), yaxis = list(title = 'ACF', titlefont = list(size = 10)), yaxis2 = list(title = 'PACF', titlefont = list(size = 10)))
+```
+
+In each case, it appears that there is not a pattern in the residuals and no autocorrelations are significant. Thus, our model fits our data relatively well.
+
+# Forecast
+
+We can visualize the point forecast along with the 95% confidence interval from lead time 1 to 50 in the graphs below (in lighter blue). The plot below also includes the 80% interval in darker blue. Given that our model does not have a constant, the forecasts well into the future are constant. As the lead time increases, we would expect our forecasts to decrease in accuracy due to the cone of uncertainty phenomenon. 
+
+```{r, warning = FALSE, echo=FALSE, fig.align='center', fig.width = 8, fig.height = 3, fig.align='center'}
+par(mfrow=c(1,2))
+
+plot(forecast(fit, h=50, level=95), col=2, main = "Forecast")
+plot(forecast(fit, h=50, level=95), col=2, ylim=c(-1, 1), main = "Forecast (Zoomed)")
+
+# subplot(fcast1, fcast2, margin = 0.05) %>% layout(xaxis = list(title = "Lag", titlefont = list(size = 10)), xaxis2 = list(title = "Lag", titlefont = list(size = 10)), yaxis = list(title = 'ACF', titlefont = list(size = 10)), yaxis2 = list(title = 'PACF', titlefont = list(size = 10)))
+# fcast_plot<-autoplot(forecast(fit, h = 50), ylim = c(-1, 1), ylab='Log Seasonally Adj. Visitors')
+# fcast_plot
+#ggplotly(fcast_plot)
+```
+While it may be difficult to see for our forecast interval, both the upper and lower intervals grow as h increases as expected based on the cone of uncertainty:
+
+```{r}
+fcasts<- forecast(fit, h = 50) %>% as.data.frame()
+print(paste0('Lo 95 Forecast First (1): ', fcasts$`Lo 95`[1] %>% round(., 3), ' and Last (50) Value: ', tail(fcasts$`Lo 95`, 1) %>% round(., 3))) 
+
+print(paste0('Hi 95 Forecast First (1): ', fcasts$`Hi 95`[1] %>% round(., 3), ' and Last (50) Value: ', tail(fcasts$`Hi 95`, 1) %>% round(., 3))) 
+```
+
+The upper and lower forecast intervals above grow in absolute value as the lead time increases. The lower bound decreases from approx. -0.819 to -0.870, and the upper bound increases from approx. 0.881 to 0.906.
+
+We can further assess the forecast by reviewing the 95% confidence interval of the fitted values compared to the actualized data in the graph below. This way, we can assess whether the forecasts seem reasonable and/or excessively wide.
+
+```{r, fig.align='center', fig.width = 8, fig.height = 3, out.width='100%'}
+upper <- fitted(fit) + 1.96*sqrt(fit$sigma2)
+lower <- fitted(fit) - 1.96*sqrt(fit$sigma2)
+plot(ys.data$visitors_adj, type="n", ylim=c(-1,1), main = 'Fitted Log Seasonally Adj. Visitors with 95% Conf. Int.', ylab='Log Seasonally Adj. Visitors')
+polygon(c(time(ys.data$visitors_adj),rev(time(ys.data$visitors_adj))), c(upper,rev(lower)), col=rgb(0,0,0.6,0.2), border=FALSE)
+lines(ys.data$visitors_adj)
+lines(fitted(fit),col='red')
+legend(1, 3, legend=c("Fitted", "95% Conf. Int."),
+       col=c("red", "gray"), lty=c(1, 1), cex=0.8)
+out <- (ys.data$visitors_adj < lower | ys.data$visitors_adj > upper)
+points(time(ys.data$visitors_adj)[out], ys.data$visitors_adj[out], pch=19)
+```
+
+The forecast may intervals seem very wide. However, given the volatility of the series (both in spring 2020 due to COVID-19 and more generally), it is a difficult series to predict. Because we are forecasting relatively far into the future (h=50), the cone of uncertainty comes into play. Since lead time, h, is relatively large, we expect the forecasts to get worse over time and the intervals need to be larger to accommodate our lack of information far into the future. 
+
+Furthermore, the black line signifies actual values, while the red line represents our forecast from the ARIMA model. The gray shaded region is the 95% forecast interval, and the black dots indicate when the actualized values do not fit in the interval. Looking at the graph above, the fitted interval misses the actualized data in April 2020, but also in five other occasions. Thus, the forecast interval may seem wide in the forecast graph above, but it is necessary to be so wide to ensure that the actual stays in the forecast 95% of the time, especially given the current data volatility / uncertainty with the pandemic. Should another lock-down occur in the future, we would want our model to be robust for it. (The Discussion section below further examines this question.)
+
+# Discussion & Next Steps
+
+While the outlier of COVID-19 impacts our forecast, the national lockdown that resulted in zero visitors happened, and our model has tried to capture this moment in the historical series. While many macroeconomic indicators experienced a shock in spring 2020 and have taken time to recover, park visitation has had a different pattern. While there is an outlier in April 2020, parks traffic across the country generally *increased* during the pandemic as more people went outside this summer compared to previous years. It will remain to be seen whether the higher visitation will be sustained in a post-pandemic world. We should incorporate this outlier into the model rather than ignore it since potential future shocks could result from other phenomena and we want our model to be robust to them.
+
+Since our forecasts are made in log seasonally adjusted visitors, if we wanted to predict the actual visitors we could transform the forecasts back to non-seasonally adjusted by adding back the average to each forecast that corresponds to the month of the forecast and taking the exponential of the forecast to transform from log to visitor levels. 
+
+In future analyses, we could also try using other types of models; for example, non-linear models or seasonal ARIMA methods. Using seasonal differences instead of seasonal averages could better capture the visitation during modeling rather than using a data transformation. Finally, we can also assess whether volatility is changing in our dataset, which may require an ARCH model. 

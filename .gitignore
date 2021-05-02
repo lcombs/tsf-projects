@@ -1,0 +1,6 @@
+*.DS_Store
+*.xls*
+*.csv
+*.Rhistory
+*.m
+*.M
