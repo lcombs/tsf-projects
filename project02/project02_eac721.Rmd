@@ -26,7 +26,7 @@ library('DT')
 
 # 0. Introduction
 
-The data for this project was retrieved from NYC Open Data which hosts all of the [311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9). The data is filtered to create about five years of data from Jan. 1, 2016 through Apr. 30, 2021 for "Noise - Residential" complaint types to reduce the size of the data pulled from the API and focus on a shorter, more recent period of time. The data was filtered using this [documentation](https://dev.socrata.com/docs/filtering.html). There are a total of 1,410,942 complaints during this time period with an average of 724 complaints per day. A simple tally (sum by date) of the complaints was used for this project so that the data could be converted to a daily time series for modeling purposes to make evenly spaced time intervals. *Note: All code for this project is available upon request on [GitHub](https://github.com/lcombs/tsf-projects/blob/main/project02/project02_eac721.Rmd).* <br/>
+The data for this project was retrieved from NYC Open Data which hosts all of the [311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9). The data is filtered to create about five years of data from Jan. 1, 2016 through Apr. 30, 2021 for "Noise - Residential" complaint types to reduce the size of the data pulled from the API and focus on a shorter, more recent period of time. The data was filtered using this [documentation](https://dev.socrata.com/docs/filtering.html). There are a total of 1,410,942 complaints during this time period with an average of 724 complaints per day. A simple tally (sum by date) of the complaints was used for this project so that the data could be converted to a daily time series for modeling purposes to make evenly spaced time intervals. *Note: All code for this project is available on [GitHub](https://github.com/lcombs/tsf-projects/blob/main/project02/project02_eac721.Rmd).* <br/>
 
 
 ```{r, echo=F, cache=TRUE}
@@ -129,7 +129,7 @@ Pacf(noise_complaints$log_n_adj_diff2, main='PACF: Diff2 Noise Complaints Adj. (
 
 ```
 
-The main purpose of differencing is to make the data stationary. We want to make sure to difference only so many times as is necessary. We wish to use an integer value for d, so there is a tough decision to make between d=0 and d=1.  We will select d=0 for the following reasons: There is a long die down in the series' ACF plot, which could indicate long memory. Furthermore, the die down does not start at autocorrelation=1. Another reason is that the ACF plot of the difference (d=1) starts out around -0.3, which is approaching -0.5. <br/>
+The main purpose of differencing is to make the data stationary. We want to make sure to difference only as many times as is necessary. We wish to use an integer value for d, so there is a tough decision to make between d=0 and d=1.  We will select d=0 for the following reasons: There is a long die down in the series' ACF plot, which could indicate long memory. Furthermore, the die down does not start at autocorrelation=1. Another reason is that the ACF plot of the difference (d=1) starts out around -0.3, which is approaching -0.5. <br/>
 
 ```{r}
 #fractional differencing:
@@ -255,7 +255,7 @@ Acf(resid^2, main='ACF: Residuals Sq.')
 Pacf(resid^2, main='PACF: Residuals Sq.')
 ```
 
-The ACF and PACF plots of the residuals do not yield significant autocorrelations and partial autocorrelations especially at low lags so they appear to be uncorrelated. There does appear to be some pattern at ~7 days between lags which may be associated to the day of week which has some structure. Even if the residuals are uncorrelated and centered at zero (the expectation is zero), they do not seem to be independent from the plots of the residuals and squared residuals. The residuals squared ACF plot has a die down effect which may indicate that there is conditional volatility that could be captured in our dataset. Specifically, when the volatility is high, the model fits less well. This is evidence of conditional heteroscedasticity since when volatility is high, it tends to remain high and when it is low it tends to remain low. There may be some structure in the residuals that we can use to improve our model using a ARCH/GARCH model, which helps us to predict the volatility rather than the levels like ARIMA does. 
+The ACF and PACF plots of the residuals do not yield significant autocorrelations and partial autocorrelations especially at low lags so they appear to be uncorrelated. There does appear to be some pattern at ~7 days between lags which may be associated with the day of week which has some structure. Even if the residuals are uncorrelated and centered at zero (the expectation is zero), they do not seem to be independent from the plots of the residuals and squared residuals. The residuals squared ACF plot has a die down effect which may indicate that there is conditional volatility that could be captured in our dataset. Specifically, when the volatility is high, the model fits less well. This is evidence of conditional heteroscedasticity since when volatility is high, it tends to remain high and when it is low it tends to remain low. There may be some structure in the residuals that we can use to improve our model using a ARCH/GARCH model, which helps us to predict the volatility rather than the levels like ARIMA does. 
 
 # 4. ARCH Model Selection & GARCH(1,1)
 
@@ -435,7 +435,7 @@ legend("topleft", inset=0.05,
 # compare 
 ```
 
-We can compute the percentage of times we miss the intervals using the past data (abs(resid)>1.96). It is is close to 5% ($\approx 4.78%$ for ARIMA-ARCH, $\approx 5.70%$ for ARIMA), so our interval is approximately wide enough to accommodate our data in both cases. However, capturing the volatility has allowed us to reach the 5% threshold and improved the forecast compared to the ARIMA only model. 
+We can compute the percentage of times we miss the intervals using the past data (abs(resid)>1.96). It is close to 5% ($\approx 4.78%$ for ARIMA-ARCH, $\approx 5.70%$ for ARIMA), so our interval is approximately wide enough to accommodate our data in both cases. However, capturing the volatility has allowed us to reach the 5% threshold and improved the forecast compared to the ARIMA only model. 
 
 ```{r, echo=F}
 
