@@ -26,7 +26,7 @@ library('DT')
 
 # 0. Introduction
 
-The data for this project was retrieved from NYC Open Data which hosts all of the [311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9). The data is filtered to create about five years of data from Jan. 1, 2016 through Apr. 30, 2021 for "Noise - Residential" complaint types to reduce the size of the data pulled from the API and focus on a shorter, more recent period of time. The data was filtered using this [documentation](https://dev.socrata.com/docs/filtering.html). There are a total of 1,410,942 complaints during this time period with an average of 724 complaints per day. A simple tally (sum by date) of the complaints was used for this project so that the data could be converted to a daily time series for modeling purposes to make evenly spaced time intervals. *Note: All code for this project is available upon request on [GitHub](https://github.com/lcombs/tsf/blob/main/Projects/project02/project02_eac721.Rmd).* <br/>
+The data for this project was retrieved from NYC Open Data which hosts all of the [311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9). The data is filtered to create about five years of data from Jan. 1, 2016 through Apr. 30, 2021 for "Noise - Residential" complaint types to reduce the size of the data pulled from the API and focus on a shorter, more recent period of time. The data was filtered using this [documentation](https://dev.socrata.com/docs/filtering.html). There are a total of 1,410,942 complaints during this time period with an average of 724 complaints per day. A simple tally (sum by date) of the complaints was used for this project so that the data could be converted to a daily time series for modeling purposes to make evenly spaced time intervals. *Note: All code for this project is available upon request on [GitHub](https://github.com/lcombs/tsf-projects/blob/main/project02/project02_eac721.Rmd).* <br/>
 
 
 ```{r, echo=F, cache=TRUE}
@@ -57,7 +57,7 @@ noise_complaints$n_diff2 <- c(NA, diff(noise_complaints$n_diff))
 
 # 1. Data Review: Take Logs, Take Differences
 
-```{r, echo=FALSE, fig.width=8, fig.height=6}
+```{r, echo=FALSE, fig.width=8, fig.height=5}
 # four plots
 par(mfrow=c(2,2))
 # series, diff series
