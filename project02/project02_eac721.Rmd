@@ -255,7 +255,7 @@ Acf(resid^2, main='ACF: Residuals Sq.')
 Pacf(resid^2, main='PACF: Residuals Sq.')
 ```
 
-The ACF and PACF plots of the residuals do not yield significant autocorrelations and partial autocorrelations especially at low lags so they appear to be uncorrelated. There does appear to be some pattern at ~7 days between lags which may be associated with the day of week which has some structure. Even if the residuals are uncorrelated and centered at zero (the expectation is zero), they do not seem to be independent from the plots of the residuals and squared residuals. The residuals squared ACF plot has a die down effect which may indicate that there is conditional volatility that could be captured in our dataset. Specifically, when the volatility is high, the model fits less well. This is evidence of conditional heteroscedasticity since when volatility is high, it tends to remain high and when it is low it tends to remain low. There may be some structure in the residuals that we can use to improve our model using a ARCH/GARCH model, which helps us to predict the volatility rather than the levels like ARIMA does. 
+The ACF and PACF plots of the residuals do not show significant autocorrelations and partial autocorrelations especially at low lags; thus, they appear to be uncorrelated. There does appear to be some pattern at ~7 days between lags, which may be associated with the day of week which has some structure even though we made a seasonality adjustment. Even if the residuals are uncorrelated and centered at zero (the expectation is zero), they do not look to be independent from the plots of the residuals and squared residuals. The residuals squared ACF plot seems to die down, which might be an indication that there is conditional volatility in our data that could be captured using a different model (i.e. ARCH). More specifically, when the volatility is high, the ARIMA model fits less well. This problem is evidence of conditional heteroscedasticity since when volatility is high, it tends to stay high and when it is low it tends to stay low. 
 
 # 4. ARCH Model Selection & GARCH(1,1)
 
@@ -393,7 +393,7 @@ lines(noise_complaints$Date, f + 1.96 * sqrt(ht), lty=2, col=2)
 lines(noise_complaints$Date, f - 1.96 * sqrt(ht), lty=2, col=2)
 
 ```
-While the forecast interval may seem wide, the past fitted values seem close together. The 95% interval follows the time series closely and appears to have only a few misses (when the interval does not capture the real data point). It appears that the forecast interval needs to be this wide to make sure we are able to forecast correctly 95% of the time. 
+While the forecast interval may seem wide, the past fitted values seem close together. The 95% interval follows the time series closely and appears to have only a few misses (when the interval does not capture the real data point). It appears that the forecast interval needs to be this wide to make sure we are able to forecast correctly 95% of the time, especially to capture the innate volatility of the dataset. 
 
 # 8. ARIMA-ARCH Model Adequecy
 
@@ -407,7 +407,7 @@ qqline(resid.arch, col=1, lty=2)
 
 ```
 
-There are a large number of data points that lie off of the x=y line towards the right and left side of the plot. This suggests that the model did not adequately describe the leptokurtosis in our data. If the model described it well, the data would sit more on the x=y line (normal data).
+There are a large number of data points that lie off of the x=y line towards the right and left side of the plot (tails of the distribution). This suggests that the model did not adequately describe the leptokurtosis in our data. If the model described it well, the data would sit more on the x=y line (normal data). 
 
 # 9. Forecast Interval Assessment
 
@@ -435,7 +435,7 @@ legend("topleft", inset=0.05,
 # compare 
 ```
 
-We can compute the percentage of times we miss the intervals using the past data (abs(resid)>1.96). It is close to 5% ($\approx 4.78%$ for ARIMA-ARCH, $\approx 5.70%$ for ARIMA), so our interval is approximately wide enough to accommodate our data in both cases. However, capturing the volatility has allowed us to reach the 5% threshold and improved the forecast compared to the ARIMA only model. 
+We can compute the percentage of times we miss the intervals using the past data (abs(resid)>1.96). It is close to 5% ($\approx 4.78%$ for ARIMA-ARCH, $\approx 5.70%$ for ARIMA), so our interval is approximately wide enough in both cases. Capturing the volatility has allowed us to reach the 5% threshold and improved the forecast compared to the ARIMA only model. 
 
 ```{r, echo=F}
 
